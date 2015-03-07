@@ -72,7 +72,8 @@ In this example we show ways to affect the restful call itself as well as show h
 ```java
 MySite template = new MySite(String api);
 template.alsoCustomHeader("customHeader");
-JsonNode node = template.submitName("bob").withCurrentAge(65).alsoTimeout(5000).alsoHeaders().alsoAdditionalParameter().do();
+JsonNode node = template.submitName("bob").withCurrentAge(65)
+               .alsoTimeout(5000).alsoHeaders().alsoAdditionalParameter().do();
 ```
 Note that optional parameters have a prefix "with", whereas built-in functions have an "also" prefix allowing a clean separation in IDE autocompletion lists. The following advanced built-in functions exist.
  - The timeout can be set on any restful call using the built-in alsoTimeout() which takes the timeout in milliseconds. The default is 5 seconds.
