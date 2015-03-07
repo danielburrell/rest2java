@@ -73,13 +73,15 @@ In this example we show ways to affect the restful call itself as well as show h
 MySite template = new MySite(String api);
 template.alsoCustomHeader("customHeader");
 JsonNode node = template.submitName("bob").withCurrentAge(65)
-               .alsoTimeout(5000).alsoHeaders().alsoAdditionalParameter().do();
+               .alsoTimeout(5000).alsoHeaders(map).alsoAdditionalParameter("key","value").do();
 ```
 Note that optional parameters have a prefix "with", whereas built-in functions have an "also" prefix allowing a clean separation in IDE autocompletion lists. The following advanced built-in functions exist.
  - The timeout can be set on any restful call using the built-in alsoTimeout() which takes the timeout in milliseconds. The default is 5 seconds.
  - Additional headers can be sent using the built-in alsoHeaders().
  - Individual parameters can be set using alsoAdditionalParameter();
  - Alternatively, multiple parameters can be set at the same time using alsoAdditionalParameters();
+ - also() methods on the template object have an effect on all subsequent calls.
+ - also() methods on an API call only last for that API call.
 
 ##Limitations:
 Current the api only support JsonNode return types, but the design of this tool will allow us to evolve this over time.
