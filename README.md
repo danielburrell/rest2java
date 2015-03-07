@@ -12,7 +12,7 @@ Simply add the following maven plugin to your pom.xml file:
 
 The examples below demonstrate what this plugin can do:
 
-##Example 1
+##Simple Example 1
 
 ```code
 https://api.mysite.com/submit_name?api_key=myApiKey&name=bob&current_age=65
@@ -59,6 +59,26 @@ MySite template = new MySite(String api);
 JsonNode node = template.submitName("bob").withCurrentAge(65).do();
 ```
 Notice how all the mandatory parameters are part of the method, and any additional optional parameters come afterwards.
+
+##Advanced Example 1
+
+In this example we show ways to affect the restful call itself as well as show how optional permenant parameters can be sent.
+{  
+   "apiName":"MySite",
+   ...
+   "optionalPermaParams":[{"javaName":"customHeader","javaName":"custom_header"}]
+}
+
+```java
+MySite template = new MySite(String api);
+template.alsoCustomHeader("customHeader");
+JsonNode node = template.submitName("bob").withCurrentAge(65).alsoTimeout(5000).alsoHeaders().alsoAdditionalParameter().do();
+```
+Note that optional parameters have a prefix "with", whereas built-in functions have an "also" prefix allowing a clean separation in IDE autocompletion lists. The following advanced built-in functions exist.
+ - The timeout can be set on any restful call using the built-in alsoTimeout() which takes the timeout in milliseconds. The default is 5 seconds.
+ - Additional headers can be sent using the built-in alsoHeaders().
+ - Individual parameters can be set using alsoAdditionalParameter();
+ - Alternatively, multiple parameters can be set at the same time using alsoAdditionalParameters();
 
 ##Limitations:
 Current the api only support JsonNode return types, but the design of this tool will allow us to evolve this over time.
