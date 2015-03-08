@@ -1,13 +1,34 @@
 # rest2java
 A maven plugin for generating a RESTful Java Client from a JSON specification.
 
+# rest2java is currently in alpha
+This plugin has not been completed yet. Release date expected June 2015.
+
 Manually writing a Java Client for a RESTful API is a difficult and time consuming exercise for all but the simplest APIs.
 This maven plugin takes a JSON description of a RESTful API as an input, and generates Java source code to act as a client.
 The sourcecode generated makes it easy to discover the API without having to refer to the original manual, see examples below to see the beautiful Client APIs which can be generated.
 
 Simply add the following maven plugin to your pom.xml file:
 ```xml
-<insertXml>here</insertXml>
+<build>
+   <plugins>
+      <plugin>
+         <groupId>uk.co.solong</groupId>
+         <artifactId>rest2java</artifactId>
+         <version>0.0.1-SNAPSHOT</version>
+         <executions>
+            <execution>
+               <configuration>
+                  <schemaFile>${basedir}/src/main/resources/schema.json</schemaFile>
+               </configuration>
+               <goals>
+                  <goal>rest2java</goal>
+               </goals>
+            </execution>
+         </executions>
+      </plugin>
+   <plugins>
+</build>
 ```
 
 The examples below demonstrate what this plugin can do:
