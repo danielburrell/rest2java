@@ -1,0 +1,82 @@
+{
+  "type" : "object",
+  "properties" : {
+    "org" : {
+      "type" : "string"
+    },
+    "apiName" : {
+      "type" : "string"
+    },
+    "serviceName" : {
+      "type" : "string"
+    },
+    "defaultBaseUrl" : {
+      "type" : "string"
+    },
+    "mandatoryPermaParams" : {
+      "type" : "array",
+      "items" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string"
+          },
+          "javaName" : {
+            "type" : "string"
+          },
+          "jsonName" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "methods" : {
+      "type" : "array",
+      "items" : {
+        "type" : "object",
+        "properties" : {
+          "methodName" : {
+            "type" : "string"
+          },
+          "mandatoryParameters" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "type" : "string"
+                },
+                "javaName" : {
+                  "type" : "string"
+                },
+                "jsonName" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "optionalParameters" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "type" : "string"
+                },
+                "javaName" : {
+                  "type" : "string"
+                },
+                "jsonName" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "url" : {
+            "type" : "string"
+          }
+        }
+      }
+    }
+  }
+}
