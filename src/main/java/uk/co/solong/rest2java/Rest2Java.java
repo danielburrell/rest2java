@@ -48,13 +48,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Mojo(name = "rest2java", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 public class Rest2Java extends AbstractMojo {
 
-    @Parameter
+    @Parameter(defaultValue="${basedir}/src/main/resources/schema.json")
     private File schemaFile;
 
     @Parameter(defaultValue = "false")
     private boolean writeToStdOut;
+    
+    @Parameter(defaultValue = "mypackage")
+    private String targetPackage;
 
-    @Parameter()
+    @Parameter(defaultValue="${project.build.directory}/generated-sources")
     private File outputDirectory;
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
@@ -63,13 +66,17 @@ public class Rest2Java extends AbstractMojo {
     public void execute() throws MojoExecutionException {
         getLog().info("Loading schema from file2: " + schemaFile);
         getLog().info("Will write output to disk: " + writeToStdOut);
+        getLog().info("Output Directory: " + outputDirectory);
+        if (!schemaFile.exists()){
+            throw new MojoExecutionException("No schema file provided");
+        }
 
         try {
             APISpec apiSpec = getApiSpec();
             validate(apiSpec);
             JSources rootSources = JDeparser.createSources(getFiler(), new FormatPreferences(new Properties()));
-            String _package = apiSpec.getOrg() + "." + apiSpec.getApiName();
-            JSourceFile apiFile = rootSources.createSourceFile(_package, apiSpec.getServiceName());
+            //String _package = apiSpec.getOrg() + "." + apiSpec.getApiName();
+            JSourceFile apiFile = rootSources.createSourceFile(targetPackage, apiSpec.getServiceName());
             // apiFile._import()
             JClassDef apiClass = apiFile._class(JMod.PUBLIC | JMod.FINAL, apiSpec.getServiceName());
 
@@ -88,7 +95,7 @@ public class Rest2Java extends AbstractMojo {
                 String builderClassName = StringUtils.capitalize(methodName) + "Builder";
                 // = JTypes._(builderClassName);
                 JSources currentBuilderSources = JDeparser.createSources(getFiler(), new FormatPreferences(new Properties()));
-                JSourceFile currentBuilderFile = currentBuilderSources.createSourceFile(_package, builderClassName);
+                JSourceFile currentBuilderFile = currentBuilderSources.createSourceFile(targetPackage, builderClassName);
                 JClassDef currentBuilderClass = currentBuilderFile._class(JMod.PUBLIC | JMod.FINAL, builderClassName);
                 JType returnType = currentBuilderClass.erasedType();
 
@@ -122,8 +129,8 @@ public class Rest2Java extends AbstractMojo {
             rootSources.writeSources();
 
             try {
-                getLog().info("Adding compiled source:" + project.getBuild().getDirectory());
-                project.addCompileSourceRoot(project.getBuild().getDirectory());
+                getLog().info("Adding compiled source:" + outputDirectory.getPath());
+                project.addCompileSourceRoot(outputDirectory.getPath());
             } catch (Throwable e) {
                 e.printStackTrace();
 
@@ -143,8 +150,8 @@ public class Rest2Java extends AbstractMojo {
 
     private void validate(APISpec apiSpec) {
         // TODO Auto-generated method stub
-        Validate.notBlank(apiSpec.getApiName());
-        Validate.notBlank(apiSpec.getOrg());
+        //Validate.notBlank(apiSpec.getApiName());
+        //Validate.notBlank(apiSpec.getOrg());
         Validate.notBlank(apiSpec.getServiceName());
         for (Method m : apiSpec.getMethods()) {
             Validate.notBlank(m.getMethodName());
@@ -164,11 +171,17 @@ public class Rest2Java extends AbstractMojo {
             if (!sourceFiles.containsKey(key)) {
 
                 File f = new File(outputDirectory + key.toDirectory());
-                if (!f.exists()) {
-                    getLog().info("creating: " + f.getCanonicalPath());
-                    f.mkdirs();
+                if (f == null) {
+                    throw new RuntimeException("Output directory was null");
                 }
-
+                getLog().info("plain1");
+                if (!f.exists()) {
+                    getLog().info("Output directory does not exist. Creating: " + f.getCanonicalPath());
+                    f.mkdirs();
+                } else {
+                    getLog().info("Output directory exists " + f.getCanonicalPath());
+                }
+                getLog().info("plain2");
                 String targetFile = outputDirectory + key.toFileName();
                 getLog().info("Writing" + targetFile);
 
