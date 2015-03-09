@@ -45,7 +45,6 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
 @Mojo(name = "rest2java", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 public class Rest2Java extends AbstractMojo {
 
@@ -54,15 +53,13 @@ public class Rest2Java extends AbstractMojo {
 
     @Parameter(defaultValue = "false")
     private boolean writeToStdOut;
-    
+
     @Parameter()
     private File outputDirectory;
 
-   
-    @Parameter(defaultValue="${project}", readonly=true, required=true)
+    @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
-    
-    
+
     public void execute() throws MojoExecutionException {
         getLog().info("Loading schema from file2: " + schemaFile);
         getLog().info("Will write output to disk: " + writeToStdOut);
@@ -95,15 +92,15 @@ public class Rest2Java extends AbstractMojo {
                 JClassDef currentBuilderClass = currentBuilderFile._class(JMod.PUBLIC | JMod.FINAL, builderClassName);
                 JType returnType = currentBuilderClass.erasedType();
 
-                //import org.springFramework.web.client.RestTemplate;
+                // import org.springFramework.web.client.RestTemplate;
                 currentBuilderFile._import(RestTemplate.class);
-                //private RestTemplate restTemplate
+                // private RestTemplate restTemplate
                 JVarDeclaration templateField = currentBuilderClass.field(JMod.PRIVATE, RestTemplate.class, "restTemplate");
-                //public BootLinodeBuilder() {
+                // public BootLinodeBuilder() {
                 JMethodDef builderConstructorDef = currentBuilderClass.constructor(JMod.PUBLIC);
-                //restTemplate = new RestTemplate();
+                // restTemplate = new RestTemplate();
                 builderConstructorDef.body().assign(JExprs.$(templateField), JTypes._(RestTemplate.class)._new());
-                
+
                 // method name
                 JMethodDef currentMethod = apiClass.method(JMod.PUBLIC | JMod.FINAL, returnType, methodName);
                 // method parameters
@@ -115,20 +112,21 @@ public class Rest2Java extends AbstractMojo {
                 // JExprs.
                 // final SubmitNameBuilder result = new SubmitNameBuilder();
                 JVarDeclaration resultDeclaration = block.var(JMod.FINAL, returnType, "result", returnType._new());
-                //currentBuilderFile._import(returnType);
-                //block.call(JExprs.$(resultDeclaration), "setTemplate").arg(JExprs.$(templateDeclaration));
+                // currentBuilderFile._import(returnType);
+                // block.call(JExprs.$(resultDeclaration),
+                // "setTemplate").arg(JExprs.$(templateDeclaration));
                 // block.assign(JExprs.$(d), JExprs._new(returnType)) ;
                 JStatement t = block._return(JExprs.$(resultDeclaration));
                 currentBuilderSources.writeSources();
             }
             rootSources.writeSources();
-            
+
             try {
-                getLog().info("Adding compiled source:"+project.getBuild().getDirectory());
-            project.addCompileSourceRoot(project.getBuild().getDirectory());
-            } catch (Throwable e){
+                getLog().info("Adding compiled source:" + project.getBuild().getDirectory());
+                project.addCompileSourceRoot(project.getBuild().getDirectory());
+            } catch (Throwable e) {
                 e.printStackTrace();
-          
+
             }
         } catch (IOException e) {
             throw new MojoExecutionException("Schema format is invalid:", e);
@@ -161,20 +159,20 @@ public class Rest2Java extends AbstractMojo {
 
     private final JFiler filer = new JFiler() {
         public OutputStream openStream(final String packageName, final String fileName) throws IOException {
-            getLog().info("Writing for "+fileName);
+            getLog().info("Writing for " + fileName);
             final Key key = new Key(packageName, fileName + ".java");
             if (!sourceFiles.containsKey(key)) {
-                
-                File f = new File(outputDirectory+key.toDirectory());
-                if (!f.exists()){
-                    getLog().info("creating: "+f.getCanonicalPath());
+
+                File f = new File(outputDirectory + key.toDirectory());
+                if (!f.exists()) {
+                    getLog().info("creating: " + f.getCanonicalPath());
                     f.mkdirs();
                 }
-                
-                String targetFile = outputDirectory+key.toFileName();
-                getLog().info("Writing"+targetFile);
-                
-                final FileOutputStream stream = new FileOutputStream(targetFile );
+
+                String targetFile = outputDirectory + key.toFileName();
+                getLog().info("Writing" + targetFile);
+
+                final FileOutputStream stream = new FileOutputStream(targetFile);
                 if (sourceFiles.putIfAbsent(key, stream) == null) {
                     if (writeToStdOut) {
                         return System.out;
@@ -191,12 +189,14 @@ public class Rest2Java extends AbstractMojo {
         return filer;
     }
 
-   /* public ByteArrayInputStream openFile(String packageName, String fileName) throws FileNotFoundException {
-        final FileOutputStream out = sourceFiles.get(new Key(packageName, fileName));
-        if (out == null)
-            throw new FileNotFoundException("No file found for package " + packageName + " file " + fileName);
-        return new ByteArrayInputStream(out.toByteArray());
-    }*/
+    /*
+     * public ByteArrayInputStream openFile(String packageName, String fileName)
+     * throws FileNotFoundException { final FileOutputStream out =
+     * sourceFiles.get(new Key(packageName, fileName)); if (out == null) throw
+     * new FileNotFoundException("No file found for package " + packageName +
+     * " file " + fileName); return new ByteArrayInputStream(out.toByteArray());
+     * }
+     */
 
     static final class Key {
         private final String packageName;
@@ -223,11 +223,12 @@ public class Rest2Java extends AbstractMojo {
             result = 31 * result + fileName.hashCode();
             return result;
         }
-        
-        public String toFileName(){
+
+        public String toFileName() {
             return new StringBuilder().append("/").append(packageName.replaceAll("\\.", "/")).append("/").append(fileName).toString();
         }
-        public String toDirectory(){
+
+        public String toDirectory() {
             return new StringBuilder().append("/").append(packageName.replaceAll("\\.", "/")).append("/").toString();
         }
     }
