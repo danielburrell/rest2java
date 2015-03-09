@@ -48,16 +48,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Mojo(name = "rest2java", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 public class Rest2Java extends AbstractMojo {
 
-    @Parameter(defaultValue="${basedir}/src/main/resources/schema.json")
+    @Parameter(defaultValue = "${basedir}/src/main/resources/schema.json")
     private File schemaFile;
 
     @Parameter(defaultValue = "false")
     private boolean writeToStdOut;
-    
+
     @Parameter(defaultValue = "mypackage")
     private String targetPackage;
 
-    @Parameter(defaultValue="${project.build.directory}/generated-sources")
+    @Parameter(defaultValue = "${project.build.directory}/generated-sources")
     private File outputDirectory;
 
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
@@ -67,7 +67,7 @@ public class Rest2Java extends AbstractMojo {
         getLog().info("Loading schema from file2: " + schemaFile);
         getLog().info("Will write output to disk: " + writeToStdOut);
         getLog().info("Output Directory: " + outputDirectory);
-        if (!schemaFile.exists()){
+        if (!schemaFile.exists()) {
             throw new MojoExecutionException("No schema file provided");
         }
 
@@ -75,7 +75,7 @@ public class Rest2Java extends AbstractMojo {
             APISpec apiSpec = getApiSpec();
             validate(apiSpec);
             JSources rootSources = JDeparser.createSources(getFiler(), new FormatPreferences(new Properties()));
-            //String _package = apiSpec.getOrg() + "." + apiSpec.getApiName();
+            // String _package = apiSpec.getOrg() + "." + apiSpec.getApiName();
             JSourceFile apiFile = rootSources.createSourceFile(targetPackage, apiSpec.getServiceName());
             // apiFile._import()
             JClassDef apiClass = apiFile._class(JMod.PUBLIC | JMod.FINAL, apiSpec.getServiceName());
@@ -128,13 +128,13 @@ public class Rest2Java extends AbstractMojo {
             }
             rootSources.writeSources();
 
-            try {
+            if (!writeToStdOut) {
                 getLog().info("Adding compiled source:" + outputDirectory.getPath());
                 project.addCompileSourceRoot(outputDirectory.getPath());
-            } catch (Throwable e) {
-                e.printStackTrace();
-
+            } else {
+                getLog().info("STDOUT is enabled. Not adding compiled source to maven classpath");
             }
+
         } catch (IOException e) {
             throw new MojoExecutionException("Schema format is invalid:", e);
         }
@@ -150,8 +150,8 @@ public class Rest2Java extends AbstractMojo {
 
     private void validate(APISpec apiSpec) {
         // TODO Auto-generated method stub
-        //Validate.notBlank(apiSpec.getApiName());
-        //Validate.notBlank(apiSpec.getOrg());
+        // Validate.notBlank(apiSpec.getApiName());
+        // Validate.notBlank(apiSpec.getOrg());
         Validate.notBlank(apiSpec.getServiceName());
         for (Method m : apiSpec.getMethods()) {
             Validate.notBlank(m.getMethodName());
