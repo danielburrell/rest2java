@@ -16,12 +16,13 @@ public class Test2  {
 
  
     
-    @Test @Ignore
+    @Test 
     public void test()  throws JsonProcessingException, MojoExecutionException {
         Rest2Java rest2Java= new Rest2Java();
         rest2Java.setSchemaFile(new File("D:/workspace/rest2java/src/main/resources/schema.json"));
-        rest2Java.setOutputDirectory(new File("D:/workspace/linode4j/target/generated-sources/"));
+        rest2Java.setOutputDirectory(new File("D:/workspace/rest2java/target/generated-sources/"));
         rest2Java.setWriteToStdOut(true);
+        rest2Java.setTargetPackage("uk.co.solong.linode4j");
         rest2Java.execute();
 
     }

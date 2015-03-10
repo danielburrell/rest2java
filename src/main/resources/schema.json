@@ -5,7 +5,7 @@
    "defaultBaseUrl":"https://api.linode.com/",
    "mandatoryPermaParams":[  
       {  
-         "type":"java.util.String",
+         "type":"java.lang.String",
          "javaName":"apiKey",
          "jsonName":"api_key"
       }

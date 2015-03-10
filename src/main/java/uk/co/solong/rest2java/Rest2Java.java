@@ -65,8 +65,11 @@ public class Rest2Java extends AbstractMojo {
 
     public void execute() throws MojoExecutionException {
         getLog().info("Loading schema from file2: " + schemaFile);
-        getLog().info("Will write output to disk: " + writeToStdOut);
-        getLog().info("Output Directory: " + outputDirectory);
+        if (!writeToStdOut) {
+            getLog().info("Will write output to disk: " + outputDirectory);
+        } else {
+            getLog().info("Will write to STDOUT");
+        }
         if (!schemaFile.exists()) {
             throw new MojoExecutionException("No schema file provided");
         }
@@ -74,7 +77,8 @@ public class Rest2Java extends AbstractMojo {
         try {
             APISpec apiSpec = getApiSpec();
             validate(apiSpec);
-            JSources rootSources = JDeparser.createSources(getFiler(), new FormatPreferences(new Properties()));
+            JFiler filer = getFiler();
+            JSources rootSources = JDeparser.createSources(filer, new FormatPreferences(new Properties()));
             // String _package = apiSpec.getOrg() + "." + apiSpec.getApiName();
             JSourceFile apiFile = rootSources.createSourceFile(targetPackage, apiSpec.getServiceName());
             // apiFile._import()
@@ -94,7 +98,7 @@ public class Rest2Java extends AbstractMojo {
                 String methodName = methodSpec.getMethodName();
                 String builderClassName = StringUtils.capitalize(methodName) + "Builder";
                 // = JTypes._(builderClassName);
-                JSources currentBuilderSources = JDeparser.createSources(getFiler(), new FormatPreferences(new Properties()));
+                JSources currentBuilderSources = JDeparser.createSources(filer, new FormatPreferences(new Properties()));
                 JSourceFile currentBuilderFile = currentBuilderSources.createSourceFile(targetPackage, builderClassName);
                 JClassDef currentBuilderClass = currentBuilderFile._class(JMod.PUBLIC | JMod.FINAL, builderClassName);
                 JType returnType = currentBuilderClass.erasedType();
@@ -127,6 +131,7 @@ public class Rest2Java extends AbstractMojo {
                 currentBuilderSources.writeSources();
             }
             rootSources.writeSources();
+            
 
             if (!writeToStdOut) {
                 getLog().info("Adding compiled source:" + outputDirectory.getPath());
@@ -151,47 +156,42 @@ public class Rest2Java extends AbstractMojo {
     private void validate(APISpec apiSpec) {
         // TODO Auto-generated method stub
         // Validate.notBlank(apiSpec.getApiName());
-        // Validate.notBlank(apiSpec.getOrg());
-        Validate.notBlank(apiSpec.getServiceName());
+        Validate.notBlank(targetPackage, "Package must not be null");
+        Validate.notBlank(apiSpec.getServiceName(), "ServiceName must not be null");
         for (Method m : apiSpec.getMethods()) {
-            Validate.notBlank(m.getMethodName());
+            Validate.notBlank(m.getMethodName(), "Method name must not be blank");
             for (MandatoryParameter mp : m.getMandatoryParameters()) {
-                Validate.notBlank(mp.getJavaName());
-                Validate.notBlank(mp.getType());
+                Validate.notBlank(mp.getJavaName(), "Parameter name must be specified in method {}", m.getMethodName());
+                Validate.notBlank(mp.getType(), "Parameter type must be specified for {} in method {}", mp.getJavaName(), m.getMethodName());
             }
         }
     }
 
-    private final ConcurrentMap<Key, FileOutputStream> sourceFiles = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Key, OutputStream> sourceFiles = new ConcurrentHashMap<>();
 
     private final JFiler filer = new JFiler() {
         public OutputStream openStream(final String packageName, final String fileName) throws IOException {
             getLog().info("Writing for " + fileName);
             final Key key = new Key(packageName, fileName + ".java");
             if (!sourceFiles.containsKey(key)) {
-
-                File f = new File(outputDirectory + key.toDirectory());
-                if (f == null) {
-                    throw new RuntimeException("Output directory was null");
-                }
-                getLog().info("plain1");
-                if (!f.exists()) {
-                    getLog().info("Output directory does not exist. Creating: " + f.getCanonicalPath());
-                    f.mkdirs();
+                OutputStream stream = null;
+                if (writeToStdOut) {
+                    stream = System.out;
                 } else {
-                    getLog().info("Output directory exists " + f.getCanonicalPath());
-                }
-                getLog().info("plain2");
-                String targetFile = outputDirectory + key.toFileName();
-                getLog().info("Writing" + targetFile);
+                    File f = new File(outputDirectory + key.toDirectory());
 
-                final FileOutputStream stream = new FileOutputStream(targetFile);
-                if (sourceFiles.putIfAbsent(key, stream) == null) {
-                    if (writeToStdOut) {
-                        return System.out;
+                    if (!f.exists()) {
+                        getLog().info("Output directory does not exist. Creating: " + f.getCanonicalPath());
+                        f.mkdirs();
                     } else {
-                        return stream;
+                        getLog().info("Output directory exists " + f.getCanonicalPath());
                     }
+                    String targetFile = outputDirectory + key.toFileName();
+                    getLog().info("Writing" + targetFile);
+                    stream = new FileOutputStream(targetFile);
+                }
+                if (sourceFiles.putIfAbsent(key, stream) == null) {
+                    return stream;
                 }
             }
             throw new IOException("Already exists");
@@ -268,6 +268,14 @@ public class Rest2Java extends AbstractMojo {
 
     public void setOutputDirectory(File outputDirectory) {
         this.outputDirectory = outputDirectory;
+    }
+
+    public String getTargetPackage() {
+        return targetPackage;
+    }
+
+    public void setTargetPackage(String targetPackage) {
+        this.targetPackage = targetPackage;
     }
 
 }
