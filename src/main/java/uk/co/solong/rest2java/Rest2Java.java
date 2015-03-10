@@ -64,7 +64,7 @@ public class Rest2Java extends AbstractMojo {
     private MavenProject project;
 
     public void execute() throws MojoExecutionException {
-        getLog().info("Loading schema from file2: " + schemaFile);
+        getLog().info("Loading schema from file: " + schemaFile);
         if (!writeToStdOut) {
             getLog().info("Will write output to disk: " + outputDirectory);
         } else {
@@ -134,16 +134,44 @@ public class Rest2Java extends AbstractMojo {
             
 
             if (!writeToStdOut) {
+                writeToFile();
                 getLog().info("Adding compiled source:" + outputDirectory.getPath());
                 project.addCompileSourceRoot(outputDirectory.getPath());
             } else {
                 getLog().info("STDOUT is enabled. Not adding compiled source to maven classpath");
+                printToStdOut();
             }
 
         } catch (IOException e) {
             throw new MojoExecutionException("Schema format is invalid:", e);
         }
 
+    }
+
+    private void printToStdOut() {
+        // TODO Auto-generated method stub
+        for (Key key: sourceFiles.keySet()) {
+            ByteArrayOutputStream s = sourceFiles.get(key);
+            System.out.println(new String(s.toByteArray()));
+        }
+    }
+
+    private void writeToFile() throws IOException {
+        for (Key key: sourceFiles.keySet()) {
+            ByteArrayOutputStream s = sourceFiles.get(key);
+            File f = new File(outputDirectory + key.toDirectory());
+
+            if (!f.exists()) {
+                getLog().info("Output directory does not exist. Creating: " + f.getCanonicalPath());
+                f.mkdirs();
+            } else {
+                getLog().debug ("Output directory exists: " + f.getCanonicalPath());
+            }
+            String targetFile = outputDirectory + key.toFileName();
+            getLog().info("Writing " + targetFile);
+            OutputStream stream = new FileOutputStream(targetFile);
+            s.writeTo(stream);
+        }
     }
 
     private APISpec getApiSpec() throws IOException, JsonParseException, JsonMappingException {
@@ -167,9 +195,9 @@ public class Rest2Java extends AbstractMojo {
         }
     }
 
-    private final ConcurrentMap<Key, OutputStream> sourceFiles = new ConcurrentHashMap<>();
-
-    private final JFiler filer = new JFiler() {
+    private final ConcurrentMap<Key, ByteArrayOutputStream> sourceFiles = new ConcurrentHashMap<>();
+/*
+    private final JFiler filerold = new JFiler() {
         public OutputStream openStream(final String packageName, final String fileName) throws IOException {
             getLog().info("Writing for " + fileName);
             final Key key = new Key(packageName, fileName + ".java");
@@ -196,7 +224,7 @@ public class Rest2Java extends AbstractMojo {
             }
             throw new IOException("Already exists");
         }
-    };
+    };*/
 
     public JFiler getFiler() {
         return filer;
@@ -237,12 +265,14 @@ public class Rest2Java extends AbstractMojo {
             return result;
         }
 
+        
+        
         public String toFileName() {
-            return new StringBuilder().append("/").append(packageName.replaceAll("\\.", "/")).append("/").append(fileName).toString();
+            return new StringBuilder().append(File.separator).append(packageName.replaceAll("\\.", File.separator)).append(File.separator).append(fileName).toString();
         }
 
         public String toDirectory() {
-            return new StringBuilder().append("/").append(packageName.replaceAll("\\.", "/")).append("/").toString();
+            return new StringBuilder().append(File.separator).append(packageName.replaceAll("\\.", File.separator)).append(File.separator).toString();
         }
     }
 
@@ -278,4 +308,16 @@ public class Rest2Java extends AbstractMojo {
         this.targetPackage = targetPackage;
     }
 
+    private final JFiler filer = new JFiler() {
+        public OutputStream openStream(final String packageName, final String fileName) throws IOException {
+            final Key key = new Key(packageName, fileName + ".java");
+            if (! sourceFiles.containsKey(key)) {
+                final ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                if (sourceFiles.putIfAbsent(key, stream) == null) {
+                    return stream;
+                }
+            }
+            throw new IOException("Already exists");
+        }
+    };
 }
