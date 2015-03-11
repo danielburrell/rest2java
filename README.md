@@ -20,6 +20,7 @@ Simply add the following maven plugin to your pom.xml file:
             <execution>
                <configuration>
                   <schemaFile>${basedir}/src/main/resources/schema.json</schemaFile>
+                  <targetPackage>uk.co.solong.linode4j</targetPackage>
                </configuration>
                <goals>
                   <goal>rest2java</goal>
