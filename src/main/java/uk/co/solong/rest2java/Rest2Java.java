@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -65,6 +66,7 @@ public class Rest2Java extends AbstractMojo {
 
     public void execute() throws MojoExecutionException {
         getLog().info("Loading schema from file: " + schemaFile);
+        getLog().info("Package is: "+targetPackage);
         if (!writeToStdOut) {
             getLog().info("Will write output to disk: " + outputDirectory);
         } else {
@@ -242,10 +244,12 @@ public class Rest2Java extends AbstractMojo {
     static final class Key {
         private final String packageName;
         private final String fileName;
+        private final String packagePath;
 
         Key(final String packageName, final String fileName) {
             this.packageName = packageName;
             this.fileName = fileName;
+            this.packagePath = packageName.replace(".", slash);
         }
 
         public boolean equals(final Object o) {
@@ -266,13 +270,14 @@ public class Rest2Java extends AbstractMojo {
         }
 
         
-        
+        private static final String slash = File.separator;
         public String toFileName() {
-            return new StringBuilder().append(File.separator).append(packageName.replaceAll("\\.", File.separator)).append(File.separator).append(fileName).toString();
+            System.out.println(slash);
+            return new StringBuilder().append(slash).append(packagePath).append(slash).append(fileName).toString();
         }
 
         public String toDirectory() {
-            return new StringBuilder().append(File.separator).append(packageName.replaceAll("\\.", File.separator)).append(File.separator).toString();
+            return new StringBuilder().append(slash).append(packagePath).append(slash).toString();
         }
     }
 
