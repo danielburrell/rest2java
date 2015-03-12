@@ -1,16 +1,15 @@
 package uk.co.solong.rest2java;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -24,6 +23,7 @@ import org.jboss.jdeparser.FormatPreferences;
 import org.jboss.jdeparser.JBlock;
 import org.jboss.jdeparser.JClassDef;
 import org.jboss.jdeparser.JDeparser;
+import org.jboss.jdeparser.JExpr;
 import org.jboss.jdeparser.JExprs;
 import org.jboss.jdeparser.JFiler;
 import org.jboss.jdeparser.JMethodDef;
@@ -35,16 +35,21 @@ import org.jboss.jdeparser.JStatement;
 import org.jboss.jdeparser.JType;
 import org.jboss.jdeparser.JTypes;
 import org.jboss.jdeparser.JVarDeclaration;
+import org.jsonschema2pojo.SchemaMapper;
 import org.springframework.web.client.RestTemplate;
 
 import uk.co.solong.rest2java.spec.APISpec;
 import uk.co.solong.rest2java.spec.MandatoryParameter;
 import uk.co.solong.rest2java.spec.MandatoryPermaParam;
 import uk.co.solong.rest2java.spec.Method;
+import uk.co.solong.rest2java.spec.OptionalParameter;
+import uk.co.solong.rest2java.spec.ReturnType;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.codemodel.JCodeModel;
 
 @Mojo(name = "rest2java", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 public class Rest2Java extends AbstractMojo {
@@ -64,9 +69,17 @@ public class Rest2Java extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    private SourcePrinter sourcePrinter;
+
+    public Rest2Java() {
+        sourcePrinter = new SourcePrinter();
+    }
+
     public void execute() throws MojoExecutionException {
+        sourcePrinter.setLog(getLog());
+        sourcePrinter.setOutputDirectory(outputDirectory);
         getLog().info("Loading schema from file: " + schemaFile);
-        getLog().info("Package is: "+targetPackage);
+        getLog().info("Package is: " + targetPackage);
         if (!writeToStdOut) {
             getLog().info("Will write output to disk: " + outputDirectory);
         } else {
@@ -79,25 +92,41 @@ public class Rest2Java extends AbstractMojo {
         try {
             APISpec apiSpec = getApiSpec();
             validate(apiSpec);
-            JFiler filer = getFiler();
+            JFiler filer = sourcePrinter.getFiler();
             JSources rootSources = JDeparser.createSources(filer, new FormatPreferences(new Properties()));
             // String _package = apiSpec.getOrg() + "." + apiSpec.getApiName();
             JSourceFile apiFile = rootSources.createSourceFile(targetPackage, apiSpec.getServiceName());
-            // apiFile._import()
+            
             JClassDef apiClass = apiFile._class(JMod.PUBLIC | JMod.FINAL, apiSpec.getServiceName());
 
+            Map<MandatoryPermaParam, JVarDeclaration> mandatoryParamToFieldMap = new HashMap<>();
+            //declare the mandatory parameters as fields first
+            for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
+                JVarDeclaration field = apiClass.field(JMod.PRIVATE | JMod.FINAL, mpp.getType(), "_" + mpp.getJavaName());
+                mandatoryParamToFieldMap.put(mpp, field);
+            }
+            
             if (apiSpec.getMandatoryPermaParams().size() > 0) {
                 JMethodDef constructorDef = apiClass.constructor(JMod.PUBLIC);
                 for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
                     JParamDeclaration param = constructorDef.param(JMod.FINAL, mpp.getType(), mpp.getJavaName());
-                    JVarDeclaration field = apiClass.field(JMod.PRIVATE | JMod.FINAL, mpp.getType(), "_" + mpp.getJavaName());
-                    constructorDef.body().assign(JExprs.$(field), JExprs.$(param));
+                    constructorDef.body().assign(JExprs.$(mandatoryParamToFieldMap.get(mpp)), JExprs.$(param));
                 }
             }
             // create the method bodies
             for (Method methodSpec : apiSpec.getMethods()) {
-                // for each method, generate a builderclass
                 String methodName = methodSpec.getMethodName();
+                
+                //generate the return type classes
+                JCodeModel codeModel = new JCodeModel();
+                ReturnType retTypeJsonSchema = methodSpec.getReturnType();
+                ObjectMapper mapper = new ObjectMapper();
+                String retTypeJsonSchemAsString = mapper.writeValueAsString(retTypeJsonSchema);
+                new SchemaMapper().generate(codeModel, StringUtils.capitalize(methodName)+"Result", targetPackage+"."+StringUtils.lowerCase(methodSpec.getMethodName()), retTypeJsonSchemAsString);
+                codeModel.build(outputDirectory);
+                
+                
+                // for each method, generate a builderclass
                 String builderClassName = StringUtils.capitalize(methodName) + "Builder";
                 // = JTypes._(builderClassName);
                 JSources currentBuilderSources = JDeparser.createSources(filer, new FormatPreferences(new Properties()));
@@ -107,13 +136,34 @@ public class Rest2Java extends AbstractMojo {
 
                 // import org.springFramework.web.client.RestTemplate;
                 currentBuilderFile._import(RestTemplate.class);
-                // private RestTemplate restTemplate
+                currentBuilderFile._import(JsonNode.class);
+                currentBuilderFile._import(java.util.Map.class);
+                currentBuilderFile._import(java.util.HashMap.class);
+                
+                // private fields in the builder class
                 JVarDeclaration templateField = currentBuilderClass.field(JMod.PRIVATE, RestTemplate.class, "restTemplate");
-                // public BootLinodeBuilder() {
+                JVarDeclaration parameterMapField = currentBuilderClass.field(JMod.PRIVATE, "Map<String,Object>", "parameters");
+                
+                //builder constructor
                 JMethodDef builderConstructorDef = currentBuilderClass.constructor(JMod.PUBLIC);
-                // restTemplate = new RestTemplate();
                 builderConstructorDef.body().assign(JExprs.$(templateField), JTypes._(RestTemplate.class)._new());
+                builderConstructorDef.body().assign(JExprs.$(parameterMapField), JTypes._("HashMap<String,Object>")._new());
 
+                //go method
+                JMethodDef goMethodDef = currentBuilderClass.method(JMod.PUBLIC, JsonNode.class, "go");               
+                String methodUrl = apiSpec.getDefaultBaseUrl();
+                JVarDeclaration goMethodReturnDeclaration = goMethodDef.body().var(JMod.FINAL, JsonNode.class, "result",JExprs.$(templateField).call("getForObject").arg(JExprs.$("\""+methodUrl+"\"")).arg(JExprs.$("JsonNode.class")).arg(JExprs.$(parameterMapField)));
+                goMethodDef.body()._return(JExprs.$(goMethodReturnDeclaration));
+                
+                //create the with() methods
+                for (OptionalParameter i : methodSpec.getOptionalParameters()){
+                    String optionalMethodName = "with"+StringUtils.capitalize(i.getJavaName());
+                    JMethodDef methodDef = currentBuilderClass.method(JMod.PUBLIC, returnType, optionalMethodName);
+                    methodDef.param(JMod.FINAL, i.getType(), i.getJavaName());
+                    methodDef.body().add(JExprs.$(parameterMapField).call("put").arg(JExprs.$("\""+i.getJsonName()+"\"")).arg(JExprs.$(i.getJavaName())));
+                    methodDef.body()._return(JExprs.name("this"));
+                    
+                }
                 // method name
                 JMethodDef currentMethod = apiClass.method(JMod.PUBLIC | JMod.FINAL, returnType, methodName);
                 // method parameters
@@ -129,19 +179,18 @@ public class Rest2Java extends AbstractMojo {
                 // block.call(JExprs.$(resultDeclaration),
                 // "setTemplate").arg(JExprs.$(templateDeclaration));
                 // block.assign(JExprs.$(d), JExprs._new(returnType)) ;
-                JStatement t = block._return(JExprs.$(resultDeclaration));
+                JStatement sometType = block._return(JExprs.$(resultDeclaration));
                 currentBuilderSources.writeSources();
             }
             rootSources.writeSources();
-            
 
             if (!writeToStdOut) {
-                writeToFile();
+                sourcePrinter.writeToFile();
                 getLog().info("Adding compiled source:" + outputDirectory.getPath());
                 project.addCompileSourceRoot(outputDirectory.getPath());
             } else {
                 getLog().info("STDOUT is enabled. Not adding compiled source to maven classpath");
-                printToStdOut();
+                sourcePrinter.printToStdOut();
             }
 
         } catch (IOException e) {
@@ -150,42 +199,13 @@ public class Rest2Java extends AbstractMojo {
 
     }
 
-    private void printToStdOut() {
-        // TODO Auto-generated method stub
-        for (Key key: sourceFiles.keySet()) {
-            ByteArrayOutputStream s = sourceFiles.get(key);
-            System.out.println(new String(s.toByteArray()));
-        }
-    }
-
-    private void writeToFile() throws IOException {
-        for (Key key: sourceFiles.keySet()) {
-            ByteArrayOutputStream s = sourceFiles.get(key);
-            File f = new File(outputDirectory + key.toDirectory());
-
-            if (!f.exists()) {
-                getLog().info("Output directory does not exist. Creating: " + f.getCanonicalPath());
-                f.mkdirs();
-            } else {
-                getLog().debug ("Output directory exists: " + f.getCanonicalPath());
-            }
-            String targetFile = outputDirectory + key.toFileName();
-            getLog().info("Writing " + targetFile);
-            OutputStream stream = new FileOutputStream(targetFile);
-            s.writeTo(stream);
-        }
-    }
-
     private APISpec getApiSpec() throws IOException, JsonParseException, JsonMappingException {
         ObjectMapper objectMapper = new ObjectMapper();
-
         APISpec apiSpec = objectMapper.readValue(schemaFile, APISpec.class);
         return apiSpec;
     }
 
     private void validate(APISpec apiSpec) {
-        // TODO Auto-generated method stub
-        // Validate.notBlank(apiSpec.getApiName());
         Validate.notBlank(targetPackage, "Package must not be null");
         Validate.notBlank(apiSpec.getServiceName(), "ServiceName must not be null");
         for (Method m : apiSpec.getMethods()) {
@@ -194,90 +214,6 @@ public class Rest2Java extends AbstractMojo {
                 Validate.notBlank(mp.getJavaName(), "Parameter name must be specified in method {}", m.getMethodName());
                 Validate.notBlank(mp.getType(), "Parameter type must be specified for {} in method {}", mp.getJavaName(), m.getMethodName());
             }
-        }
-    }
-
-    private final ConcurrentMap<Key, ByteArrayOutputStream> sourceFiles = new ConcurrentHashMap<>();
-/*
-    private final JFiler filerold = new JFiler() {
-        public OutputStream openStream(final String packageName, final String fileName) throws IOException {
-            getLog().info("Writing for " + fileName);
-            final Key key = new Key(packageName, fileName + ".java");
-            if (!sourceFiles.containsKey(key)) {
-                OutputStream stream = null;
-                if (writeToStdOut) {
-                    stream = System.out;
-                } else {
-                    File f = new File(outputDirectory + key.toDirectory());
-
-                    if (!f.exists()) {
-                        getLog().info("Output directory does not exist. Creating: " + f.getCanonicalPath());
-                        f.mkdirs();
-                    } else {
-                        getLog().info("Output directory exists " + f.getCanonicalPath());
-                    }
-                    String targetFile = outputDirectory + key.toFileName();
-                    getLog().info("Writing" + targetFile);
-                    stream = new FileOutputStream(targetFile);
-                }
-                if (sourceFiles.putIfAbsent(key, stream) == null) {
-                    return stream;
-                }
-            }
-            throw new IOException("Already exists");
-        }
-    };*/
-
-    public JFiler getFiler() {
-        return filer;
-    }
-
-    /*
-     * public ByteArrayInputStream openFile(String packageName, String fileName)
-     * throws FileNotFoundException { final FileOutputStream out =
-     * sourceFiles.get(new Key(packageName, fileName)); if (out == null) throw
-     * new FileNotFoundException("No file found for package " + packageName +
-     * " file " + fileName); return new ByteArrayInputStream(out.toByteArray());
-     * }
-     */
-
-    static final class Key {
-        private final String packageName;
-        private final String fileName;
-        private final String packagePath;
-
-        Key(final String packageName, final String fileName) {
-            this.packageName = packageName;
-            this.fileName = fileName;
-            this.packagePath = packageName.replace(".", slash);
-        }
-
-        public boolean equals(final Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-
-            final Key key = (Key) o;
-
-            return fileName.equals(key.fileName) && packageName.equals(key.packageName);
-        }
-
-        public int hashCode() {
-            int result = packageName.hashCode();
-            result = 31 * result + fileName.hashCode();
-            return result;
-        }
-
-        
-        private static final String slash = File.separator;
-        public String toFileName() {
-            System.out.println(slash);
-            return new StringBuilder().append(slash).append(packagePath).append(slash).append(fileName).toString();
-        }
-
-        public String toDirectory() {
-            return new StringBuilder().append(slash).append(packagePath).append(slash).toString();
         }
     }
 
@@ -313,16 +249,4 @@ public class Rest2Java extends AbstractMojo {
         this.targetPackage = targetPackage;
     }
 
-    private final JFiler filer = new JFiler() {
-        public OutputStream openStream(final String packageName, final String fileName) throws IOException {
-            final Key key = new Key(packageName, fileName + ".java");
-            if (! sourceFiles.containsKey(key)) {
-                final ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                if (sourceFiles.putIfAbsent(key, stream) == null) {
-                    return stream;
-                }
-            }
-            throw new IOException("Already exists");
-        }
-    };
 }

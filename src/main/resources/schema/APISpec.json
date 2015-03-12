@@ -74,8 +74,12 @@
           },
           "url" : {
             "type" : "string"
+          },
+          "returnType" : {
+            "type" : "object"
           }
         }
+        
       }
     }
   }
