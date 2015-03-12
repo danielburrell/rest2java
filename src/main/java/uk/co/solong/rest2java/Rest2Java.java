@@ -5,7 +5,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,6 +23,7 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.jboss.jdeparser.FormatPreferences;
 import org.jboss.jdeparser.JBlock;
+import org.jboss.jdeparser.JCall;
 import org.jboss.jdeparser.JClassDef;
 import org.jboss.jdeparser.JDeparser;
 import org.jboss.jdeparser.JExpr;
@@ -35,7 +38,13 @@ import org.jboss.jdeparser.JStatement;
 import org.jboss.jdeparser.JType;
 import org.jboss.jdeparser.JTypes;
 import org.jboss.jdeparser.JVarDeclaration;
+import org.jsonschema2pojo.DefaultGenerationConfig;
+import org.jsonschema2pojo.GenerationConfig;
+import org.jsonschema2pojo.Jackson2Annotator;
+import org.jsonschema2pojo.SchemaGenerator;
 import org.jsonschema2pojo.SchemaMapper;
+import org.jsonschema2pojo.SchemaStore;
+import org.jsonschema2pojo.rules.RuleFactory;
 import org.springframework.web.client.RestTemplate;
 
 import uk.co.solong.rest2java.spec.APISpec;
@@ -99,13 +108,15 @@ public class Rest2Java extends AbstractMojo {
             
             JClassDef apiClass = apiFile._class(JMod.PUBLIC | JMod.FINAL, apiSpec.getServiceName());
 
-            Map<MandatoryPermaParam, JVarDeclaration> mandatoryParamToFieldMap = new HashMap<>();
+
             //declare the mandatory parameters as fields first
+            Map<MandatoryPermaParam, JVarDeclaration> mandatoryParamToFieldMap = new HashMap<>();
             for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
                 JVarDeclaration field = apiClass.field(JMod.PRIVATE | JMod.FINAL, mpp.getType(), "_" + mpp.getJavaName());
                 mandatoryParamToFieldMap.put(mpp, field);
             }
             
+            //take api parameters etc
             if (apiSpec.getMandatoryPermaParams().size() > 0) {
                 JMethodDef constructorDef = apiClass.constructor(JMod.PUBLIC);
                 for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
@@ -113,6 +124,7 @@ public class Rest2Java extends AbstractMojo {
                     constructorDef.body().assign(JExprs.$(mandatoryParamToFieldMap.get(mpp)), JExprs.$(param));
                 }
             }
+            
             // create the method bodies
             for (Method methodSpec : apiSpec.getMethods()) {
                 String methodName = methodSpec.getMethodName();
@@ -122,13 +134,28 @@ public class Rest2Java extends AbstractMojo {
                 ReturnType retTypeJsonSchema = methodSpec.getReturnType();
                 ObjectMapper mapper = new ObjectMapper();
                 String retTypeJsonSchemAsString = mapper.writeValueAsString(retTypeJsonSchema);
-                new SchemaMapper().generate(codeModel, StringUtils.capitalize(methodName)+"Result", targetPackage+"."+StringUtils.lowerCase(methodSpec.getMethodName()), retTypeJsonSchemAsString);
+                String returnTypeClassName = StringUtils.capitalize(methodName)+"Result";
+                String returnTypePackageString = targetPackage+"."+StringUtils.lowerCase(methodSpec.getMethodName());
+                String qualifiedReturnTypeClassName = returnTypePackageString+"."+returnTypeClassName;
+                DefaultGenerationConfig config = new DefaultGenerationConfig(){
+                    @Override
+                    public boolean isUseCommonsLang3() {
+                        // TODO Auto-generated method stub
+                        return true;
+                    }
+                };
+                
+                RuleFactory ruleFactory = new RuleFactory(config , new Jackson2Annotator(), new SchemaStore());
+         
+                new SchemaMapper(ruleFactory , new SchemaGenerator()).generate(codeModel, returnTypeClassName , returnTypePackageString, retTypeJsonSchemAsString);
+                if (!outputDirectory.exists()){
+                    outputDirectory.mkdirs();
+                }
                 codeModel.build(outputDirectory);
                 
                 
-                // for each method, generate a builderclass
+                // generate a builderclass file for this method
                 String builderClassName = StringUtils.capitalize(methodName) + "Builder";
-                // = JTypes._(builderClassName);
                 JSources currentBuilderSources = JDeparser.createSources(filer, new FormatPreferences(new Properties()));
                 JSourceFile currentBuilderFile = currentBuilderSources.createSourceFile(targetPackage, builderClassName);
                 JClassDef currentBuilderClass = currentBuilderFile._class(JMod.PUBLIC | JMod.FINAL, builderClassName);
@@ -139,6 +166,7 @@ public class Rest2Java extends AbstractMojo {
                 currentBuilderFile._import(JsonNode.class);
                 currentBuilderFile._import(java.util.Map.class);
                 currentBuilderFile._import(java.util.HashMap.class);
+                currentBuilderFile._import(qualifiedReturnTypeClassName);
                 
                 // private fields in the builder class
                 JVarDeclaration templateField = currentBuilderClass.field(JMod.PRIVATE, RestTemplate.class, "restTemplate");
@@ -146,13 +174,33 @@ public class Rest2Java extends AbstractMojo {
                 
                 //builder constructor
                 JMethodDef builderConstructorDef = currentBuilderClass.constructor(JMod.PUBLIC);
+                //add constructor params from the api's mandatory set
+                for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
+                    JParamDeclaration param = builderConstructorDef.param(JMod.FINAL, mpp.getType(), mpp.getJavaName());
+                }
+                //add constructor params from the builders mandatory set
+                for (MandatoryParameter mpp : methodSpec.getMandatoryParameters()) {
+                    JParamDeclaration param = builderConstructorDef.param(JMod.FINAL, mpp.getType(), mpp.getJavaName());
+                }
+                
+                //add constructor params from the method's mandatory set
                 builderConstructorDef.body().assign(JExprs.$(templateField), JTypes._(RestTemplate.class)._new());
                 builderConstructorDef.body().assign(JExprs.$(parameterMapField), JTypes._("HashMap<String,Object>")._new());
+                
+                //assign the parameters in the builder constructor into a hashmap
+                for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
+                    builderConstructorDef.body().add(JExprs.$(parameterMapField).call("put").arg(JExprs.$("\""+mpp.getJsonName()+"\"")).arg(JExprs.$(mpp.getJavaName())));
+                }
+                
+              //assign the parameters in the builder constructor into a hashmap
+                for (MandatoryParameter mpp : methodSpec.getMandatoryParameters()) {
+                    builderConstructorDef.body().add(JExprs.$(parameterMapField).call("put").arg(JExprs.$("\""+mpp.getJsonName()+"\"")).arg(JExprs.$(mpp.getJavaName())));
+                }
 
                 //go method
-                JMethodDef goMethodDef = currentBuilderClass.method(JMod.PUBLIC, JsonNode.class, "go");               
-                String methodUrl = apiSpec.getDefaultBaseUrl();
-                JVarDeclaration goMethodReturnDeclaration = goMethodDef.body().var(JMod.FINAL, JsonNode.class, "result",JExprs.$(templateField).call("getForObject").arg(JExprs.$("\""+methodUrl+"\"")).arg(JExprs.$("JsonNode.class")).arg(JExprs.$(parameterMapField)));
+                JMethodDef goMethodDef = currentBuilderClass.method(JMod.PUBLIC, qualifiedReturnTypeClassName, "go");               
+                String methodUrl = apiSpec.getDefaultBaseUrl()+methodSpec.getUrl();
+                JVarDeclaration goMethodReturnDeclaration = goMethodDef.body().var(JMod.FINAL, qualifiedReturnTypeClassName, "result",JExprs.$(templateField).call("getForObject").arg(JExprs.$("\""+methodUrl+"\"")).arg(JExprs.$(qualifiedReturnTypeClassName+".class")).arg(JExprs.$(parameterMapField)));
                 goMethodDef.body()._return(JExprs.$(goMethodReturnDeclaration));
                 
                 //create the with() methods
@@ -164,17 +212,30 @@ public class Rest2Java extends AbstractMojo {
                     methodDef.body()._return(JExprs.name("this"));
                     
                 }
+                
                 // method name
                 JMethodDef currentMethod = apiClass.method(JMod.PUBLIC | JMod.FINAL, returnType, methodName);
+                List<JParamDeclaration> methodParamdeclarationList = new ArrayList<JParamDeclaration>();
                 // method parameters
                 for (MandatoryParameter mp : methodSpec.getMandatoryParameters()) {
                     JParamDeclaration vap = currentMethod.param(JMod.FINAL, mp.getType(), mp.getJavaName());
+                    methodParamdeclarationList.add(vap);
                 }
                 JBlock block = currentMethod.body();
 
                 // JExprs.
                 // final SubmitNameBuilder result = new SubmitNameBuilder();
-                JVarDeclaration resultDeclaration = block.var(JMod.FINAL, returnType, "result", returnType._new());
+                JCall myNew = returnType._new();
+                //pass each of the fixed parameters
+                for (MandatoryPermaParam mp : apiSpec.getMandatoryPermaParams()) {
+                    myNew.arg(JExprs.$("_"+mp.getJavaName()));
+                }
+                
+                //pass eacah of the mandatory method parameters    
+                for (JParamDeclaration param:methodParamdeclarationList){
+                    myNew.arg(JExprs.$(param));
+                }
+                JVarDeclaration resultDeclaration = block.var(JMod.FINAL, returnType, "result", myNew);
                 // currentBuilderFile._import(returnType);
                 // block.call(JExprs.$(resultDeclaration),
                 // "setTemplate").arg(JExprs.$(templateDeclaration));
