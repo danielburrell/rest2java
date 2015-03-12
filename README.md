@@ -85,11 +85,13 @@ Notice how all the mandatory parameters are part of the method, and any addition
 ##Advanced Example 1
 
 In this example we show ways to affect the restful call itself as well as show how optional permenant parameters can be sent.
+```json 
 {  
    "apiName":"MySite",
    ...
    "optionalPermaParams":[{"javaName":"customHeader","javaName":"custom_header"}]
 }
+```
 
 ```java
 MySite template = new MySite(String api);
