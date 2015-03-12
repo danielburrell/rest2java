@@ -104,6 +104,3 @@ Note that optional parameters have a prefix "with", whereas built-in functions h
  - Alternatively, multiple parameters can be set at the same time using alsoAdditionalParameters();
  - also() methods on the template object have an effect on all subsequent calls.
  - also() methods on an API call only last for that API call.
-
-##Limitations:
-Current the api only support JsonNode return types, but the design of this tool will allow us to evolve this over time.
