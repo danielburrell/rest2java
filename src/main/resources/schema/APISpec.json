@@ -51,6 +51,9 @@
                 },
                 "jsonName" : {
                   "type" : "string"
+                },
+                "description" : {
+                  "type" : "string"
                 }
               }
             }
@@ -68,11 +71,31 @@
                 },
                 "jsonName" : {
                   "type" : "string"
+                },
+                "description" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "fixedParameters" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "jsonName" : {
+                  "type" : "string"
+                },
+                "jsonValue" : {
+                  "type" : "string"
                 }
               }
             }
           },
           "url" : {
+            "type" : "string"
+          },
+          "description" : {
             "type" : "string"
           },
           "returnType" : {

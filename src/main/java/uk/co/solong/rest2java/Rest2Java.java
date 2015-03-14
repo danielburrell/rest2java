@@ -26,6 +26,7 @@ import org.jboss.jdeparser.JBlock;
 import org.jboss.jdeparser.JCall;
 import org.jboss.jdeparser.JClassDef;
 import org.jboss.jdeparser.JDeparser;
+import org.jboss.jdeparser.JDocComment;
 import org.jboss.jdeparser.JExpr;
 import org.jboss.jdeparser.JExprs;
 import org.jboss.jdeparser.JFiler;
@@ -46,8 +47,10 @@ import org.jsonschema2pojo.SchemaMapper;
 import org.jsonschema2pojo.SchemaStore;
 import org.jsonschema2pojo.rules.RuleFactory;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import uk.co.solong.rest2java.spec.APISpec;
+import uk.co.solong.rest2java.spec.FixedParameter;
 import uk.co.solong.rest2java.spec.MandatoryParameter;
 import uk.co.solong.rest2java.spec.MandatoryPermaParam;
 import uk.co.solong.rest2java.spec.Method;
@@ -105,18 +108,17 @@ public class Rest2Java extends AbstractMojo {
             JSources rootSources = JDeparser.createSources(filer, new FormatPreferences(new Properties()));
             // String _package = apiSpec.getOrg() + "." + apiSpec.getApiName();
             JSourceFile apiFile = rootSources.createSourceFile(targetPackage, apiSpec.getServiceName());
-            
+
             JClassDef apiClass = apiFile._class(JMod.PUBLIC | JMod.FINAL, apiSpec.getServiceName());
 
-
-            //declare the mandatory parameters as fields first
+            // declare the mandatory parameters as fields first
             Map<MandatoryPermaParam, JVarDeclaration> mandatoryParamToFieldMap = new HashMap<>();
             for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
                 JVarDeclaration field = apiClass.field(JMod.PRIVATE | JMod.FINAL, mpp.getType(), "_" + mpp.getJavaName());
                 mandatoryParamToFieldMap.put(mpp, field);
             }
-            
-            //take api parameters etc
+
+            // take api parameters etc
             if (apiSpec.getMandatoryPermaParams().size() > 0) {
                 JMethodDef constructorDef = apiClass.constructor(JMod.PUBLIC);
                 for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
@@ -124,36 +126,39 @@ public class Rest2Java extends AbstractMojo {
                     constructorDef.body().assign(JExprs.$(mandatoryParamToFieldMap.get(mpp)), JExprs.$(param));
                 }
             }
-            
+
             // create the method bodies
             for (Method methodSpec : apiSpec.getMethods()) {
                 String methodName = methodSpec.getMethodName();
-                
-                //generate the return type classes
-                JCodeModel codeModel = new JCodeModel();
-                ReturnType retTypeJsonSchema = methodSpec.getReturnType();
-                ObjectMapper mapper = new ObjectMapper();
-                String retTypeJsonSchemAsString = mapper.writeValueAsString(retTypeJsonSchema);
-                String returnTypeClassName = StringUtils.capitalize(methodName)+"Result";
-                String returnTypePackageString = targetPackage+"."+StringUtils.lowerCase(methodSpec.getMethodName());
-                String qualifiedReturnTypeClassName = returnTypePackageString+"."+returnTypeClassName;
-                DefaultGenerationConfig config = new DefaultGenerationConfig(){
-                    @Override
-                    public boolean isUseCommonsLang3() {
-                        // TODO Auto-generated method stub
-                        return true;
+
+                String qualifiedReturnTypeClassName = "java.lang.String";
+                if (methodSpec.getReturnType() != null) {
+                    // generate the return type classes
+                    JCodeModel codeModel = new JCodeModel();
+                    ReturnType retTypeJsonSchema = methodSpec.getReturnType();
+                    ObjectMapper mapper = new ObjectMapper();
+                    String retTypeJsonSchemAsString = mapper.writeValueAsString(retTypeJsonSchema);
+                    String returnTypeClassName = StringUtils.capitalize(methodName) + "Result";
+                    String returnTypePackageString = targetPackage + "." + StringUtils.lowerCase(methodSpec.getMethodName());
+                    qualifiedReturnTypeClassName = returnTypePackageString + "." + returnTypeClassName;
+                    DefaultGenerationConfig config = new DefaultGenerationConfig() {
+                        @Override
+                        public boolean isUseCommonsLang3() {
+                            // TODO Auto-generated method stub
+                            return true;
+                        }
+                    };
+
+                    RuleFactory ruleFactory = new RuleFactory(config, new Jackson2Annotator(), new SchemaStore());
+
+                    new SchemaMapper(ruleFactory, new SchemaGenerator()).generate(codeModel, returnTypeClassName, returnTypePackageString,
+                            retTypeJsonSchemAsString);
+                    if (!outputDirectory.exists()) {
+                        outputDirectory.mkdirs();
                     }
-                };
-                
-                RuleFactory ruleFactory = new RuleFactory(config , new Jackson2Annotator(), new SchemaStore());
-         
-                new SchemaMapper(ruleFactory , new SchemaGenerator()).generate(codeModel, returnTypeClassName , returnTypePackageString, retTypeJsonSchemAsString);
-                if (!outputDirectory.exists()){
-                    outputDirectory.mkdirs();
+                    codeModel.build(outputDirectory);
                 }
-                codeModel.build(outputDirectory);
-                
-                
+
                 // generate a builderclass file for this method
                 String builderClassName = StringUtils.capitalize(methodName) + "Builder";
                 JSources currentBuilderSources = JDeparser.createSources(filer, new FormatPreferences(new Properties()));
@@ -167,72 +172,107 @@ public class Rest2Java extends AbstractMojo {
                 currentBuilderFile._import(java.util.Map.class);
                 currentBuilderFile._import(java.util.HashMap.class);
                 currentBuilderFile._import(qualifiedReturnTypeClassName);
-                
+                currentBuilderFile._import(UriComponentsBuilder.class);
                 // private fields in the builder class
                 JVarDeclaration templateField = currentBuilderClass.field(JMod.PRIVATE, RestTemplate.class, "restTemplate");
                 JVarDeclaration parameterMapField = currentBuilderClass.field(JMod.PRIVATE, "Map<String,Object>", "parameters");
-                
-                //builder constructor
+
+                // builder constructor
                 JMethodDef builderConstructorDef = currentBuilderClass.constructor(JMod.PUBLIC);
-                //add constructor params from the api's mandatory set
+                // add constructor params from the api's mandatory set
                 for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
                     JParamDeclaration param = builderConstructorDef.param(JMod.FINAL, mpp.getType(), mpp.getJavaName());
                 }
-                //add constructor params from the builders mandatory set
+                // add constructor params from the builders mandatory set
                 for (MandatoryParameter mpp : methodSpec.getMandatoryParameters()) {
                     JParamDeclaration param = builderConstructorDef.param(JMod.FINAL, mpp.getType(), mpp.getJavaName());
-                }
-                
-                //add constructor params from the method's mandatory set
-                builderConstructorDef.body().assign(JExprs.$(templateField), JTypes._(RestTemplate.class)._new());
-                builderConstructorDef.body().assign(JExprs.$(parameterMapField), JTypes._("HashMap<String,Object>")._new());
-                
-                //assign the parameters in the builder constructor into a hashmap
-                for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
-                    builderConstructorDef.body().add(JExprs.$(parameterMapField).call("put").arg(JExprs.$("\""+mpp.getJsonName()+"\"")).arg(JExprs.$(mpp.getJavaName())));
-                }
-                
-              //assign the parameters in the builder constructor into a hashmap
-                for (MandatoryParameter mpp : methodSpec.getMandatoryParameters()) {
-                    builderConstructorDef.body().add(JExprs.$(parameterMapField).call("put").arg(JExprs.$("\""+mpp.getJsonName()+"\"")).arg(JExprs.$(mpp.getJavaName())));
                 }
 
-                //go method
-                JMethodDef goMethodDef = currentBuilderClass.method(JMod.PUBLIC, qualifiedReturnTypeClassName, "go");               
-                String methodUrl = apiSpec.getDefaultBaseUrl()+methodSpec.getUrl();
-                JVarDeclaration goMethodReturnDeclaration = goMethodDef.body().var(JMod.FINAL, qualifiedReturnTypeClassName, "result",JExprs.$(templateField).call("getForObject").arg(JExprs.$("\""+methodUrl+"\"")).arg(JExprs.$(qualifiedReturnTypeClassName+".class")).arg(JExprs.$(parameterMapField)));
+                // add constructor params from the method's mandatory set
+                builderConstructorDef.body().assign(JExprs.$(templateField), JTypes._(RestTemplate.class)._new());
+                builderConstructorDef.body().assign(JExprs.$(parameterMapField), JTypes._("HashMap<String,Object>")._new());
+
+                // assign the parameters in the builder constructor into a
+                // hashmap
+                for (MandatoryPermaParam mpp : apiSpec.getMandatoryPermaParams()) {
+                    builderConstructorDef.body().add(
+                            JExprs.$(parameterMapField).call("put").arg(JExprs.$("\"" + mpp.getJsonName() + "\"")).arg(JExprs.$(mpp.getJavaName())));
+                }
+
+                // assign the parameters in the builder constructor into a
+                // hashmap
+                for (MandatoryParameter mpp : methodSpec.getMandatoryParameters()) {
+                    builderConstructorDef.body().add(
+                            JExprs.$(parameterMapField).call("put").arg(JExprs.$("\"" + mpp.getJsonName() + "\"")).arg(JExprs.$(mpp.getJavaName())));
+                }
+
+                // assign the parameters in the builder constructor into a
+                // hashmap
+                for (FixedParameter mpp : methodSpec.getFixedParameters()) {
+                    builderConstructorDef.body().add(
+                            JExprs.$(parameterMapField).call("put").arg(JExprs.$("\"" + mpp.getJsonName() + "\"")).arg(JExprs.str(mpp.getJsonValue())));
+                }
+
+                // go method
+                JMethodDef goMethodDef = currentBuilderClass.method(JMod.PUBLIC, qualifiedReturnTypeClassName, "go");
+                String methodUrl = apiSpec.getDefaultBaseUrl() + methodSpec.getUrl();
+                goMethodDef.body().var(
+                        JMod.FINAL,
+                        UriComponentsBuilder.class,
+                        "b",
+                        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
+                                .arg(JExprs.str(methodSpec.getUrl())));
+                JBlock forDef = goMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
+                forDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
+                goMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
+
+                JVarDeclaration goMethodReturnDeclaration = goMethodDef.body().var(
+                        JMod.FINAL,
+                        qualifiedReturnTypeClassName,
+                        "result",
+                        JExprs.$(templateField).call("getForObject").arg(JExprs.$("uriString")).arg(JExprs.$(qualifiedReturnTypeClassName + ".class"))
+                                .arg(JExprs.$(parameterMapField)));
                 goMethodDef.body()._return(JExprs.$(goMethodReturnDeclaration));
-                
-                //create the with() methods
-                for (OptionalParameter i : methodSpec.getOptionalParameters()){
-                    String optionalMethodName = "with"+StringUtils.capitalize(i.getJavaName());
+
+                // create the with() methods
+                for (OptionalParameter i : methodSpec.getOptionalParameters()) {
+                    String optionalMethodName = "with" + StringUtils.capitalize(i.getJavaName());
                     JMethodDef methodDef = currentBuilderClass.method(JMod.PUBLIC, returnType, optionalMethodName);
                     methodDef.param(JMod.FINAL, i.getType(), i.getJavaName());
-                    methodDef.body().add(JExprs.$(parameterMapField).call("put").arg(JExprs.$("\""+i.getJsonName()+"\"")).arg(JExprs.$(i.getJavaName())));
+                    methodDef.body().add(JExprs.$(parameterMapField).call("put").arg(JExprs.$("\"" + i.getJsonName() + "\"")).arg(JExprs.$(i.getJavaName())));
                     methodDef.body()._return(JExprs.name("this"));
-                    
+
                 }
-                
+
                 // method name
                 JMethodDef currentMethod = apiClass.method(JMod.PUBLIC | JMod.FINAL, returnType, methodName);
+                 
+                String methodComment = ""; 
+                if (methodSpec.getDescription() != null) {
+                    methodComment = methodSpec.getDescription();
+                }
+                JDocComment commentDef = currentMethod.docComment().text(methodComment);
                 List<JParamDeclaration> methodParamdeclarationList = new ArrayList<JParamDeclaration>();
                 // method parameters
                 for (MandatoryParameter mp : methodSpec.getMandatoryParameters()) {
                     JParamDeclaration vap = currentMethod.param(JMod.FINAL, mp.getType(), mp.getJavaName());
                     methodParamdeclarationList.add(vap);
+                    if (mp.getDescription() != null){
+                        commentDef.param(vap.name()).text(mp.getDescription());
+                    }
                 }
                 JBlock block = currentMethod.body();
 
                 // JExprs.
                 // final SubmitNameBuilder result = new SubmitNameBuilder();
                 JCall myNew = returnType._new();
-                //pass each of the fixed parameters
+                // pass each of the fixed parameters
                 for (MandatoryPermaParam mp : apiSpec.getMandatoryPermaParams()) {
-                    myNew.arg(JExprs.$("_"+mp.getJavaName()));
+                    myNew.arg(JExprs.$("_" + mp.getJavaName()));
                 }
-                
-                //pass eacah of the mandatory method parameters    
-                for (JParamDeclaration param:methodParamdeclarationList){
+
+                // pass eacah of the mandatory method parameters
+                for (JParamDeclaration param : methodParamdeclarationList) {
                     myNew.arg(JExprs.$(param));
                 }
                 JVarDeclaration resultDeclaration = block.var(JMod.FINAL, returnType, "result", myNew);
