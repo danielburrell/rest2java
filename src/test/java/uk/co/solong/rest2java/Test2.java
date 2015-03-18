@@ -17,7 +17,7 @@ public class Test2  {
     }
     
     @Test 
-    public void test()  throws JsonProcessingException, MojoExecutionException {
+    public void shouldPass()  throws JsonProcessingException, MojoExecutionException {
         Rest2Java rest2Java= new Rest2Java();
         rest2Java.setSchemaFile(new File("D:/workspace/rest2java/src/main/resources/schema.json"));
         rest2Java.setOutputDirectory(new File("D:/workspace/rest2java/target/generated-sources/"));
