@@ -15,7 +15,7 @@ Simply add the following maven plugin to your pom.xml file:
       <plugin>
          <groupId>uk.co.solong</groupId>
          <artifactId>rest2java</artifactId>
-         <version>0.0.1-SNAPSHOT</version>
+         <version>0.0.3</version>
          <executions>
             <execution>
                <configuration>
