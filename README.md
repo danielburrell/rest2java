@@ -9,7 +9,9 @@ Manually writing a Java Client for a RESTful API is a tedious, time consuming, a
 This maven plugin takes a JSON description of a RESTful API as an input, and generates Java source code to act as a client.
 The sourcecode generated makes it easy to discover the API without having to refer to the original manual, see examples below to see the beautiful Client APIs which can be generated.
 
-Simply add the following maven plugin to your pom.xml file:
+#Quickstart
+
+Simply add the following maven plugin to the build section of your pom.xml file:
 ```xml
 <build>
    <plugins>
