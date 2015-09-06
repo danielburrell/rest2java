@@ -213,75 +213,13 @@ public class Rest2Java extends AbstractMojo {
                             JExprs.$(parameterMapField).call("put").arg(JExprs.$("\"" + mpp.getJsonName() + "\"")).arg(JExprs.str(mpp.getJsonValue())));
                 }
 
-                // go method
-                JMethodDef goMethodDef = currentBuilderClass.method(JMod.PUBLIC, qualifiedReturnTypeClassName, "asObject");
-              
-                goMethodDef.body().var(
-                        JMod.FINAL,
-                        UriComponentsBuilder.class,
-                        "b",
-                        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
-                                .arg(JExprs.str(methodSpec.getUrl())));
-                JBlock forDef = goMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
-                forDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
-                goMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
-
-                JVarDeclaration goMethodReturnDeclaration = goMethodDef.body().var(
-                        JMod.FINAL,
-                        qualifiedReturnTypeClassName,
-                        "result",
-                        JExprs.$(templateField).call("getForObject").arg(JExprs.$("uriString")).arg(JExprs.$(qualifiedReturnTypeClassName + ".class"))
-                                .arg(JExprs.$(parameterMapField)));
-                goMethodDef.body()._return(JExprs.$(goMethodReturnDeclaration));
-
-                
-                // string method
-                JMethodDef stringMethodDef = currentBuilderClass.method(JMod.PUBLIC, String.class, "asString");
-               
-                stringMethodDef.body().var(
-                        JMod.FINAL,
-                        UriComponentsBuilder.class,
-                        "b",
-                        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
-                                .arg(JExprs.str(methodSpec.getUrl())));
-                JBlock stringforDef = stringMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
-                stringforDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
-                stringMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
-
-                JVarDeclaration stringMethodReturnDeclaration = stringMethodDef.body().var(
-                        JMod.FINAL,
-                        String.class,
-                        "result",
-                        JExprs.$(templateField).call("getForObject").arg(JExprs.$("uriString")).arg(JExprs.$("String.class"))
-                                .arg(JExprs.$(parameterMapField)));
-                stringMethodDef.body()._return(JExprs.$(stringMethodReturnDeclaration));
-
-                
-             // string method
-                JMethodDef jsonMethodDef = currentBuilderClass.method(JMod.PUBLIC, JsonNode.class, "asJson");
-               
-                jsonMethodDef.body().var(
-                        JMod.FINAL,
-                        UriComponentsBuilder.class,
-                        "b",
-                        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
-                                .arg(JExprs.str(methodSpec.getUrl())));
-                JBlock jsonforDef = jsonMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
-                jsonforDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
-                jsonMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
-
-                JVarDeclaration jsonMethodReturnDeclaration = jsonMethodDef.body().var(
-                        JMod.FINAL,
-                        JsonNode.class,
-                        "result",
-                        JExprs.$(templateField).call("getForObject").arg(JExprs.$("uriString")).arg(JExprs.$("JsonNode.class"))
-                                .arg(JExprs.$(parameterMapField)));
-                jsonMethodDef.body()._return(JExprs.$(jsonMethodReturnDeclaration));
-
-                
-                
-                
-                
+				if ("GET".equals(methodSpec.getRequestMethod())) {
+					createRestTemplateExecutionMethods(apiSpec, methodSpec, qualifiedReturnTypeClassName,
+							currentBuilderClass, templateField, parameterMapField);
+				} else {
+					createRestTemplateExecutionMethodsPut(apiSpec, methodSpec, qualifiedReturnTypeClassName,
+							currentBuilderClass, templateField, parameterMapField);
+				}
                 // create the with() methods
                 for (OptionalParameter i : methodSpec.getOptionalParameters()) {
                     String optionalMethodName = "with" + StringUtils.capitalize(i.getJavaName());
@@ -347,6 +285,151 @@ public class Rest2Java extends AbstractMojo {
         }
 
     }
+
+	private void createRestTemplateExecutionMethods(APISpec apiSpec, Method methodSpec,
+			String qualifiedReturnTypeClassName, JClassDef currentBuilderClass, JVarDeclaration templateField,
+			JVarDeclaration parameterMapField) {
+		{
+		// go method
+		JMethodDef goMethodDef = currentBuilderClass.method(JMod.PUBLIC, qualifiedReturnTypeClassName, "asObject");
+           
+		goMethodDef.body().var(
+		        JMod.FINAL,
+		        UriComponentsBuilder.class,
+		        "b",
+		        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
+		                .arg(JExprs.str(methodSpec.getUrl())));
+		JBlock forDef = goMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
+		forDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
+		goMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
+
+		JVarDeclaration goMethodReturnDeclaration = goMethodDef.body().var(
+		        JMod.FINAL,
+		        qualifiedReturnTypeClassName,
+		        "result",
+		        JExprs.$(templateField).call("getForObject").arg(JExprs.$("uriString")).arg(JExprs.$(qualifiedReturnTypeClassName + ".class"))
+		                .arg(JExprs.$(parameterMapField)));
+		goMethodDef.body()._return(JExprs.$(goMethodReturnDeclaration));
+
+		
+		// string method
+		JMethodDef stringMethodDef = currentBuilderClass.method(JMod.PUBLIC, String.class, "asString");
+            
+		stringMethodDef.body().var(
+		        JMod.FINAL,
+		        UriComponentsBuilder.class,
+		        "b",
+		        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
+		                .arg(JExprs.str(methodSpec.getUrl())));
+		JBlock stringforDef = stringMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
+		stringforDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
+		stringMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
+
+		JVarDeclaration stringMethodReturnDeclaration = stringMethodDef.body().var(
+		        JMod.FINAL,
+		        String.class,
+		        "result",
+		        JExprs.$(templateField).call("getForObject").arg(JExprs.$("uriString")).arg(JExprs.$("String.class"))
+		                .arg(JExprs.$(parameterMapField)));
+		stringMethodDef.body()._return(JExprs.$(stringMethodReturnDeclaration));
+
+		
+          // string method
+		JMethodDef jsonMethodDef = currentBuilderClass.method(JMod.PUBLIC, JsonNode.class, "asJson");
+            
+		jsonMethodDef.body().var(
+		        JMod.FINAL,
+		        UriComponentsBuilder.class,
+		        "b",
+		        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
+		                .arg(JExprs.str(methodSpec.getUrl())));
+		JBlock jsonforDef = jsonMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
+		jsonforDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
+		jsonMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
+
+		JVarDeclaration jsonMethodReturnDeclaration = jsonMethodDef.body().var(
+		        JMod.FINAL,
+		        JsonNode.class,
+		        "result",
+		        JExprs.$(templateField).call("getForObject").arg(JExprs.$("uriString")).arg(JExprs.$("JsonNode.class"))
+		                .arg(JExprs.$(parameterMapField)));
+		jsonMethodDef.body()._return(JExprs.$(jsonMethodReturnDeclaration));
+
+		}
+	}
+	
+	
+	private void createRestTemplateExecutionMethodsPut(APISpec apiSpec, Method methodSpec,
+			String qualifiedReturnTypeClassName, JClassDef currentBuilderClass, JVarDeclaration templateField,
+			JVarDeclaration parameterMapField) {
+		{
+		// go method
+		JMethodDef goMethodDef = currentBuilderClass.method(JMod.PUBLIC, qualifiedReturnTypeClassName, "asObject");
+           
+		goMethodDef.body().var(
+		        JMod.FINAL,
+		        UriComponentsBuilder.class,
+		        "b",
+		        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
+		                .arg(JExprs.str(methodSpec.getUrl())));
+		JBlock forDef = goMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
+		forDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
+		goMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
+
+		JVarDeclaration goMethodReturnDeclaration = goMethodDef.body().var(
+		        JMod.FINAL,
+		        qualifiedReturnTypeClassName,
+		        "result",
+		        JExprs.$(templateField).call("postForObject").arg(JExprs.$("uriString")).arg(JExprs.$(qualifiedReturnTypeClassName + ".class"))
+		                .arg(JExprs.$(parameterMapField)));
+		goMethodDef.body()._return(JExprs.$(goMethodReturnDeclaration));
+
+		
+		// string method
+		JMethodDef stringMethodDef = currentBuilderClass.method(JMod.PUBLIC, String.class, "asString");
+            
+		stringMethodDef.body().var(
+		        JMod.FINAL,
+		        UriComponentsBuilder.class,
+		        "b",
+		        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
+		                .arg(JExprs.str(methodSpec.getUrl())));
+		JBlock stringforDef = stringMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
+		stringforDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
+		stringMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
+
+		JVarDeclaration stringMethodReturnDeclaration = stringMethodDef.body().var(
+		        JMod.FINAL,
+		        String.class,
+		        "result",
+		        JExprs.$(templateField).call("postForObject").arg(JExprs.$("uriString")).arg(JExprs.$("String.class"))
+		                .arg(JExprs.$(parameterMapField)));
+		stringMethodDef.body()._return(JExprs.$(stringMethodReturnDeclaration));
+
+		
+          // string method
+		JMethodDef jsonMethodDef = currentBuilderClass.method(JMod.PUBLIC, JsonNode.class, "asJson");
+            
+		jsonMethodDef.body().var(
+		        JMod.FINAL,
+		        UriComponentsBuilder.class,
+		        "b",
+		        JExprs.callStatic(UriComponentsBuilder.class, "fromUriString").arg(JExprs.str(apiSpec.getDefaultBaseUrl())).call("path")
+		                .arg(JExprs.str(methodSpec.getUrl())));
+		JBlock jsonforDef = jsonMethodDef.body().forEach(JMod.FINAL, String.class, " t", JExprs.$(parameterMapField).call("keySet"));
+		jsonforDef.add(JExprs.$("b").call("queryParam").arg(JExprs.$("t")).arg(JExprs.$(parameterMapField).call("get").arg(JExprs.$("t")).call("toString")));
+		jsonMethodDef.body().var(JMod.FINAL, String.class, "uriString", JExprs.$("b").call("build").call("toUriString"));
+
+		JVarDeclaration jsonMethodReturnDeclaration = jsonMethodDef.body().var(
+		        JMod.FINAL,
+		        JsonNode.class,
+		        "result",
+		        JExprs.$(templateField).call("postForObject").arg(JExprs.$("uriString")).arg(JExprs.$("JsonNode.class"))
+		                .arg(JExprs.$(parameterMapField)));
+		jsonMethodDef.body()._return(JExprs.$(jsonMethodReturnDeclaration));
+
+		}
+	}
 
     private APISpec getApiSpec() throws IOException, JsonParseException, JsonMappingException {
         ObjectMapper objectMapper = new ObjectMapper();
