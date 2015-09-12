@@ -115,7 +115,7 @@ public final class ${method.methodName?cap_first}Builder {
         <#if optionalParameter.isPostParam??>
         postParameters.put("${optionalParameter.jsonName}", ${optionalParameter.javaName});
         <#else>
-        parameters.put("${optionalParameter.jsonName}", "${optionalParameter.javaName}");
+        parameters.put("${optionalParameter.jsonName}", ${optionalParameter.javaName});
         </#if>
         return this;
     }
