@@ -1,6 +1,9 @@
 {
   "type" : "object",
   "properties" : {
+    "package" : {
+      "type" : "string"
+    },
     "org" : {
       "type" : "string"
     },
@@ -37,6 +40,10 @@
         "properties" : {
           "methodName" : {
             "type" : "string"
+          },
+          "methodType" : {
+            "javaType" : "org.springframework.http.HttpMethod",
+            "type": "object"
           },
           "mandatoryParameters" : {
             "type" : "array",
