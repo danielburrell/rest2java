@@ -102,6 +102,9 @@
           "url" : {
             "type" : "string"
           },
+          "requestMethod" : {
+            "type" : "string"
+          },
           "description" : {
             "type" : "string"
           },
