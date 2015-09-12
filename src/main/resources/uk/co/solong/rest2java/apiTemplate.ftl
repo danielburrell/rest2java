@@ -15,8 +15,16 @@ public final class ${serviceName} {
     <#list methods as method>
     /**
      */
+    <#assign includeComma=false>
+    <#if mandatoryPermaParams??>
+        <#if method.mandatoryParameters??>
+            <#if (((method.mandatoryParameters?size) > 0) && ((mandatoryPermaParams?size) > 0)) >
+                <#assign includeComma=true>
+            </#if>
+        </#if>
+    </#if>
     public final ${method.methodName?cap_first}Builder ${method.methodName}(<#list method.mandatoryParameters as mandatoryParameter>final ${mandatoryParameter.type} ${mandatoryParameter.javaName}<#sep>,</#list>) {
-        final ${method.methodName?cap_first}Builder result = new ${method.methodName?cap_first}Builder(<#list mandatoryPermaParams as mandatoryPermaParam>_${mandatoryPermaParam.javaName}<#sep>,</#list>, <#list method.mandatoryParameters as mandatoryParameter> ${mandatoryParameter.javaName}<#sep>,</#list>);
+        final ${method.methodName?cap_first}Builder result = new ${method.methodName?cap_first}Builder(<#list mandatoryPermaParams as mandatoryPermaParam>_${mandatoryPermaParam.javaName}<#sep>,</#list><#if includeComma>,</#if> <#list method.mandatoryParameters as mandatoryParameter> ${mandatoryParameter.javaName}<#sep>,</#list>);
         return result;
     }
     </#list>

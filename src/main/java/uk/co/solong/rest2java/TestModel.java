@@ -45,6 +45,9 @@ public class TestModel implements TemplateDirectiveModel {
         } else {
             log.info("Writing class " + extractFileNameFromOutputDirective(params));
             String outputFile = extractFileNameFromOutputDirective(params);
+            File f = new File(outputFile).getParentFile();
+            log.debug("Creating folders");
+            f.mkdirs();
             out = new PrintWriter(outputFile, "UTF-8");
             body.render(out);
             out.flush();

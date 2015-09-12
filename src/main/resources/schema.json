@@ -62,6 +62,49 @@
          ],
          "url":""
          
+      },
+      
+      {  
+         "methodType":"POST",
+         "methodName":"testNoFixed",
+         "mandatoryParameters":[  
+            {  
+               "type":"java.lang.String",
+               "javaName":"mandatoryValueToEcho",
+               "jsonName":"mandatoryValueToEcho"
+            }
+         ],
+         "optionalParameters":[  
+            {  
+               "isPostParam":true,
+               "type":"java.lang.String",
+               "javaName":"optionalValueToEcho",
+               "jsonName":"optionalValueToEcho"
+            }
+         ],
+         "url":""
+         
+      },
+      
+      {  
+         "methodType":"POST",
+         "methodName":"testNoMandatory",
+         "optionalParameters":[  
+            {  
+               "isPostParam":true,
+               "type":"java.lang.String",
+               "javaName":"optionalValueToEcho",
+               "jsonName":"optionalValueToEcho"
+            }
+         ],
+         "fixedParameters":[
+            {
+               "jsonName":"api_action",
+               "jsonValue":"test.echo"
+            }
+         ],
+         "url":""
+         
       }
    ]
 }

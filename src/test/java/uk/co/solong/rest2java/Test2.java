@@ -26,7 +26,7 @@ public class Test2  {
         rest2Java.setOutputDirectory(new File("D:/workspace/rest2java/target/generated-sources/"));
         rest2Java.setWriteToStdOut(true);
         rest2Java.setTargetPackage("uk.co.solong.linode4j");
-        rest2Java.execute2();
+        rest2Java.execute();
 
     }
 }

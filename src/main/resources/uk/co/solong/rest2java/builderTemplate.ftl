@@ -10,13 +10,24 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.http.HttpMethod;
 import java.lang.String;
 import java.util.Map;
+import static org.springframework.http.HttpMethod.*;
 
 public final class ${method.methodName?cap_first}Builder {
     private RestTemplate restTemplate;
     private Map<String,Object> parameters;
     private Map<String,Object> postParameters;
     private HttpMethod methodType = ${method.methodType!"GET"};
-    public ${method.methodName?cap_first}Builder(<#list mandatoryPermaParams as mandatoryPermaParam>final ${mandatoryPermaParam.type} _${mandatoryPermaParam.javaName}<#sep>,</#list>, <#list method.mandatoryParameters as mandatoryParameter> final ${mandatoryParameter.type} ${mandatoryParameter.javaName}<#sep>,</#list>) {
+    
+   
+    <#assign includeComma=false>
+    <#if mandatoryPermaParams??>
+        <#if method.mandatoryParameters??>
+            <#if (((method.mandatoryParameters?size) > 0) && ((mandatoryPermaParams?size) > 0)) >
+                <#assign includeComma=true>
+            </#if>
+        </#if>
+    </#if>
+    public ${method.methodName?cap_first}Builder(<#list mandatoryPermaParams as mandatoryPermaParam>final ${mandatoryPermaParam.type} ${mandatoryPermaParam.javaName}<#sep>,</#list><#if includeComma>,</#if> <#if method.mandatoryParameters??><#list method.mandatoryParameters as mandatoryParameter> final ${mandatoryParameter.type} ${mandatoryParameter.javaName}<#sep>,</#list></#if>) {
         restTemplate = new RestTemplate();
         parameters = new HashMap<String,Object>();
         postParameters = new HashMap<String,Object>();
@@ -69,7 +80,7 @@ public final class ${method.methodName?cap_first}Builder {
 
         final String uriString = b.build().toUriString();
         if (HttpMethod.POST.equals(methodType)) {
-            final UriComponentsBuilder postParamBuilder = UriComponentsBuilder.fromUriString().path();
+            final UriComponentsBuilder postParamBuilder = UriComponentsBuilder.fromUriString("").path("");
             for (final String t : postParameters.keySet()) postParamBuilder.queryParam(t, postParameters.get(t).toString());
             final String postParameterString = postParamBuilder.build().toUriString();
             
@@ -88,7 +99,7 @@ public final class ${method.methodName?cap_first}Builder {
         final String uriString = b.build().toUriString();
         if (HttpMethod.POST.equals(methodType)) {
         
-            final UriComponentsBuilder postParamBuilder = UriComponentsBuilder.fromUriString().path();
+            final UriComponentsBuilder postParamBuilder = UriComponentsBuilder.fromUriString("").path("");
             for (final String t : postParameters.keySet()) postParamBuilder.queryParam(t, postParameters.get(t).toString());
             final String postParameterString = postParamBuilder.build().toUriString();
             final JsonNode result = restTemplate.postForObject(uriString, postParameterString, JsonNode.class, parameters);

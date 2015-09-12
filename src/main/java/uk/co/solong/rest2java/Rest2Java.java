@@ -62,14 +62,12 @@ public class Rest2Java extends AbstractMojo {
 
         Configuration cfg = new Configuration(Configuration.VERSION_2_3_22);
         cfg.setSharedVariable("output", new TestModel(outputDirectory, writeToStdOut, getLog()));
-        ClassLoader classLoader = getClass().getClassLoader();
-        File file = new File(classLoader.getResource("templates/apiTemplate.ftl").getFile());
+       // ClassLoader classLoader = getClass().getClassLoader();
+       // File file = new File(classLoader.getResource("templates/apiTemplate.ftl").getFile());
 
-        try {
-            cfg.setDirectoryForTemplateLoading(file.getParentFile());
-        } catch (IOException e) {
-            throw new MojoExecutionException("Unable to set template directory", e);
-        }
+        
+        cfg.setClassForTemplateLoading(Rest2Java.class, "");
+        
         cfg.setDefaultEncoding("UTF-8");
         cfg.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
 
@@ -87,6 +85,10 @@ public class Rest2Java extends AbstractMojo {
             generateBuilderClasses(cfg, apiSpec);
         } catch (IOException | TemplateException e) {
             throw new MojoExecutionException("Unable to generate classes", e);
+        }
+        if (!writeToStdOut){
+        getLog().info("Adding compiled source:" + outputDirectory.getPath());
+        project.addCompileSourceRoot(outputDirectory.getPath());
         }
     }
 
