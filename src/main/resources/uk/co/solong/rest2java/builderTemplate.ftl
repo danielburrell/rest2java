@@ -12,6 +12,11 @@ import java.lang.String;
 import java.util.Map;
 import static org.springframework.http.HttpMethod.*;
 
+
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+
 public final class ${method.methodName?cap_first}Builder {
     private RestTemplate restTemplate;
     private Map<String,Object> parameters;
@@ -62,7 +67,12 @@ public final class ${method.methodName?cap_first}Builder {
     <#--
     public String asObject() {
         final UriComponentsBuilder b = UriComponentsBuilder.fromUriString("https://api.linode.com/").path("");
-        for (final String t : parameters.keySet()) b.queryParam(t, parameters.get(t).toString());
+        for (final String t : parameters.keySet()) {
+            Object maybeParam = parameters.get(t);
+            if (maybeParam != null) {
+                b.queryParam(t, maybeParam.toString());
+            }
+        }
 
         final String uriString = b.build().toUriString();
         if (HttpMethod.POST.equals(methodType)) {
@@ -76,7 +86,12 @@ public final class ${method.methodName?cap_first}Builder {
     }-->
     public String asString() {
         final UriComponentsBuilder b = UriComponentsBuilder.fromUriString("${defaultBaseUrl}").path("${method.url}");
-        for (final String t : parameters.keySet()) b.queryParam(t, parameters.get(t).toString());
+        for (final String t : parameters.keySet()) {
+            Object maybeParam = parameters.get(t);
+            if (maybeParam != null) {
+                b.queryParam(t, maybeParam.toString());
+            }
+        }
 
         final String uriString = b.build().toUriString();
         if (HttpMethod.POST.equals(methodType)) {
@@ -94,15 +109,30 @@ public final class ${method.methodName?cap_first}Builder {
     
     public JsonNode asJson() {
         final UriComponentsBuilder b = UriComponentsBuilder.fromUriString("${defaultBaseUrl}").path("${method.url}");
-        for (final String t : parameters.keySet()) b.queryParam(t, parameters.get(t).toString());
+        for (final String t : parameters.keySet()) {
+            Object maybeParam = parameters.get(t);
+            if (maybeParam != null) {
+                b.queryParam(t, maybeParam.toString());
+            }
+        }
 
         final String uriString = b.build().toUriString();
         if (HttpMethod.POST.equals(methodType)) {
         
-            final UriComponentsBuilder postParamBuilder = UriComponentsBuilder.fromUriString("").path("");
-            for (final String t : postParameters.keySet()) postParamBuilder.queryParam(t, postParameters.get(t).toString());
-            final String postParameterString = postParamBuilder.build().toUriString();
-            final JsonNode result = restTemplate.postForObject(uriString, postParameterString, JsonNode.class, parameters);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+         
+            final UriComponentsBuilder postParamBuilder = UriComponentsBuilder.fromUriString("http://placeholder.com");
+            for (final String t : postParameters.keySet()) {
+                Object maybeParam = postParameters.get(t);
+                if (maybeParam != null) {
+                    postParamBuilder.queryParam(t, maybeParam.toString());
+                }
+            }
+            final String postParameterString = postParamBuilder.build().toUriString().replaceAll("http://placeholder.com\\?", "");
+            
+            HttpEntity<String> entity = new HttpEntity<String>(postParameterString, headers);
+            final JsonNode result = restTemplate.postForObject(uriString, entity, JsonNode.class, parameters);
             return result;
         } else {
             final JsonNode result = restTemplate.getForObject(uriString, JsonNode.class, parameters);
