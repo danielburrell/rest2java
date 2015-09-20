@@ -112,7 +112,7 @@ public final class ${method.methodName?cap_first}Builder {
         for (final String t : parameters.keySet()) {
             Object maybeParam = parameters.get(t);
             if (maybeParam != null) {
-                b.queryParam(t, maybeParam.toString());
+                b.queryParam(t, "{"+t+"}");
             }
         }
 
